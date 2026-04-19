@@ -1,12 +1,17 @@
 const express = require('express');
 const cors = require('cors');
-const { connect } = require('puppeteer-real-browser');
+const puppeteer = require('puppeteer');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const delay = ms => new Promise(r => setTimeout(r, ms));
+// Configuration du proxy
+const PROXY_HOST = '23.26.71.145';
+const PROXY_PORT = '5628';
+const PROXY_USER = 'Finoana123';
+const PROXY_PASS = 'Finoana123';
+const PROXY_URL = `http://${PROXY_USER}:${PROXY_PASS}@${PROXY_HOST}:${PROXY_PORT}`;
 
 app.post('/test-login', async (req, res) => {
   const { email, password, platform } = req.body;
@@ -17,12 +22,25 @@ app.post('/test-login', async (req, res) => {
   let browser;
   try {
     const loginUrl = `https://${platform}.io/login.php`;
-    const { browser: br, page } = await connect({
+
+    // Lancer Puppeteer avec le proxy
+    browser = await puppeteer.launch({
       headless: true,
-      turnstile: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        `--proxy-server=${PROXY_HOST}:${PROXY_PORT}`
+      ]
     });
-    browser = br;
+
+    const page = await browser.newPage();
+
+    // Authentification au proxy
+    await page.authenticate({ username: PROXY_USER, password: PROXY_PASS });
+
+    // User-agent réaliste
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1280, height: 720 });
 
     await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 30000 });
     await page.type('input[type="email"], input[name="email"]', email);
