@@ -11,7 +11,6 @@ const PROXY_HOST = '23.26.71.145';
 const PROXY_PORT = '5628';
 const PROXY_USER = 'Finoana123';
 const PROXY_PASS = 'Finoana123';
-const PROXY_URL = `http://${PROXY_USER}:${PROXY_PASS}@${PROXY_HOST}:${PROXY_PORT}`;
 
 app.post('/test-login', async (req, res) => {
   const { email, password, platform } = req.body;
@@ -23,20 +22,34 @@ app.post('/test-login', async (req, res) => {
   try {
     const loginUrl = `https://${platform}.io/login.php`;
 
-    // Lancer Puppeteer avec le proxy
+    // Lancer Puppeteer avec le proxy (sans authentification dans l'URL)
     browser = await puppeteer.launch({
       headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        `--proxy-server=${PROXY_HOST}:${PROXY_PORT}`
-      ]
+        `--proxy-server=${PROXY_HOST}:${PROXY_PORT}`,
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process'
+      ],
+      // Augmenter le timeout pour le démarrage
+      timeout: 60000
     });
 
     const page = await browser.newPage();
 
-    // Authentification au proxy
+    // Authentification au proxy (doit être faite avant toute navigation)
     await page.authenticate({ username: PROXY_USER, password: PROXY_PASS });
+
+    // Tester que le proxy fonctionne (optionnel)
+    try {
+      await page.goto('https://api.ipify.org?format=json', { timeout: 10000 });
+      const body = await page.evaluate(() => document.body.textContent);
+      const ip = JSON.parse(body).ip;
+      console.log(`🌍 IP via proxy : ${ip}`);
+    } catch (e) {
+      console.warn('Proxy test failed, continuing anyway...');
+    }
 
     // User-agent réaliste
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
@@ -60,7 +73,8 @@ app.post('/test-login', async (req, res) => {
   } catch (err) {
     if (browser) await browser.close();
     console.error(err);
-    res.status(500).json({ error: err.message });
+    // Renvoyer l'erreur complète pour le débogage
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 
