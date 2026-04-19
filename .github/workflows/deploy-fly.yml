@@ -8,6 +8,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Create app on Fly.io (if not exists)
+        run: flyctl apps create tronpick-login-api --org personal || true
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       - name: Deploy to Fly.io
         run: flyctl deploy --remote-only
         env:
