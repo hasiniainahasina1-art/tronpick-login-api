@@ -23,19 +23,15 @@ app.post('/test-login', async (req, res) => {
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-features=IsolateOrigins,site-per-process'
+        '--disable-blink-features=AutomationControlled'
       ]
     });
     browser = br;
 
-    // Masquer webdriver
+    // Masquer le webdriver
     await page.evaluateOnNewDocument(() => {
       Object.defineProperty(navigator, 'webdriver', { get: () => false });
-      delete navigator.__proto__.webdriver;
     });
-
-    // User-Agent réaliste (Windows + Chrome)
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 720 });
 
@@ -46,17 +42,15 @@ app.post('/test-login', async (req, res) => {
     await page.type('input[type="password"]', password, { delay: 50 });
     await delay(1000);
 
-    // Gestion Turnstile : attendre que l'iframe soit résolu (puppeteer-real-browser le fait)
-    try {
-      await page.waitForFunction(() => {
-        const iframe = document.querySelector('iframe[src*="challenges.cloudflare.com"]');
-        return !iframe || iframe.style.display === 'none';
-      }, { timeout: 15000 });
-    } catch (e) {
-      console.log('Pas de Turnstile ou déjà passé');
-    }
+    // Tentative de clic sur "Log in"
+    const loginClicked = await page.evaluate(() => {
+      const btns = [...document.querySelectorAll('button')];
+      const btn = btns.find(b => b.textContent.trim().toLowerCase() === 'log in');
+      if (btn) { btn.click(); return true; }
+      return false;
+    });
+    if (!loginClicked) throw new Error('Bouton Log in introuvable');
 
-    await page.click('button:contains("Log in")');
     await page.waitForNavigation({ timeout: 20000 }).catch(() => {});
     await delay(3000);
 
